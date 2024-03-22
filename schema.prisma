@@ -1,0 +1,126 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["extendedWhereUnique"]
+}
+
+model User {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  email    String   @unique
+  password String
+  role     UserRole @default(PARTICIPANT)
+
+  events   Event[]
+  payments Payment[]
+  orders   Order[]
+
+  @@map("user")
+}
+
+enum UserRole {
+  ADMIN
+  PARTICIPANT
+  ORGANIZER
+}
+
+model Venue {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  address     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  maxCapacity Int      @map("max_capacity")
+
+  events Event[]
+
+  @@map("venue")
+}
+
+model Event {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  slug      String      @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  start     DateTime
+  end       DateTime
+  price     Float
+  status    EventStatus @default(SUCCESS)
+
+  venue       Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  venueId     String @map("venue_id") @db.ObjectId
+  organizer   User   @relation(fields: [organizerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  organizerId String @map("organizer_id") @db.ObjectId
+
+  orders Order[]
+
+  @@map("event")
+}
+
+model Ticket {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  orderId String @map("order_id") @db.ObjectId
+
+  @@map("ticket")
+}
+
+model Order {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  noOfTickets Int         @map("no_of_tickets")
+  status      OrderStatus
+  payment     Payment?
+
+  tickets Ticket[]
+
+  event         Event  @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  eventId       String @map("event_id") @db.ObjectId
+  participant   User   @relation(fields: [participantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  participantId String @map("participant_id") @db.ObjectId
+
+  @@map("schedule")
+}
+
+model Payment {
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  amount    Float
+  method    PaymentMethod
+  status    PaymentStatus @default(PAID)
+
+  participant   User   @relation(fields: [participantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  participantId String @map("participant_id") @db.ObjectId
+  order         Order  @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  orderId       String @unique @map("order_id") @db.ObjectId
+}
+
+enum PaymentStatus {
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+}
+
+enum OrderStatus {
+  SUCCESS
+  CANCELLED_BY_PARTICIPANT
+  CANCELLED_BY_ADMIN
+  CANCELLED_BY_ORGANIZER
+}
+
+enum EventStatus {
+  CANCELLED
+  SUCCESS
+}
